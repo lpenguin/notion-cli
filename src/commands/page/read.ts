@@ -1,0 +1,82 @@
+/**
+ * notion-cli page read <page-id>
+ *
+ * Fetch a Notion page and output its content as Markdown.
+ *
+ * Options:
+ *   --numbered-lines  Output with line numbers (for subsequent patching)
+ *
+ * This command is idempotent and read-only.
+ */
+
+import { type Command } from 'commander';
+import { getClient } from '../../lib/client.js';
+import { notionPageToMarkdown, addLineNumbers } from '../../lib/markdown.js';
+import { printSuccess } from '../../lib/output.js';
+import { withRetry } from '../../lib/rate-limit.js';
+import { parseNotionId } from '../../utils/id.js';
+import { type GlobalOptions, type PageReadResult } from '../../lib/types.js';
+import { toCliError } from '../../lib/errors.js';
+import * as logger from '../../utils/logger.js';
+
+export function registerPageReadCommand(page: Command): void {
+  page
+    .command('read')
+    .description('Fetch a Notion page and output as Markdown.')
+    .argument('<page-id>', 'Notion page ID or URL')
+    .option('--numbered-lines', 'Include line numbers (for use with `page patch --lines`)')
+    .action(async (rawId: string, cmdOpts: { numberedLines?: boolean }) => {
+      try {
+        const opts = page.optsWithGlobals<GlobalOptions>();
+        const pageId = parseNotionId(rawId);
+        const client = getClient(opts.token);
+
+        // Fetch page metadata
+        const pageObj = await withRetry(
+          () => client.pages.retrieve({ page_id: pageId }),
+          'pages.retrieve',
+        );
+
+        // Extract title
+        const props = (pageObj as Record<string, unknown>)['properties'] as Record<string, Record<string, unknown>> | undefined;
+        let title = 'Untitled';
+        if (props !== undefined) {
+          for (const prop of Object.values(props)) {
+            if (prop['type'] === 'title') {
+              const titleArr = prop['title'] as Array<Record<string, unknown>> | undefined;
+              if (titleArr !== undefined && titleArr.length > 0) {
+                title = (titleArr[0]?.['plain_text'] as string | undefined) ?? 'Untitled';
+              }
+              break;
+            }
+          }
+        }
+
+        // Fetch and convert content
+        let markdown = await withRetry(
+          () => notionPageToMarkdown(client, pageId),
+          'pageToMarkdown',
+        );
+
+        const lastEdited = (pageObj as Record<string, unknown>)['last_edited_time'] as string | undefined;
+
+        if (cmdOpts.numberedLines === true) {
+          markdown = addLineNumbers(markdown);
+        }
+
+        const result: PageReadResult = {
+          pageId,
+          title,
+          markdown,
+          lastEditedTime: lastEdited ?? '',
+        };
+
+        printSuccess(result);
+        logger.success(`Read page: ${title}`);
+      } catch (err) {
+        const cliErr = toCliError(err);
+        logger.error(cliErr.message);
+        process.exitCode = cliErr.exitCode;
+      }
+    });
+}

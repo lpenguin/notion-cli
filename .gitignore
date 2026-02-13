@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.env
+.notion-cli.json
+*.tsbuildinfo
+coverage/
+.DS_Store
+Thumbs.db
