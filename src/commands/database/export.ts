@@ -9,7 +9,7 @@
 
 import { type Command } from 'commander';
 import { writeFileSync } from 'node:fs';
-import { getClient } from '../../lib/client.js';
+import { getClient, resolveDataSourceId } from '../../lib/client.js';
 import { rowsToCsv } from '../../lib/csv.js';
 import { printSuccess, printError } from '../../lib/output.js';
 import { withRetry } from '../../lib/rate-limit.js';
@@ -17,6 +17,7 @@ import { parseNotionId } from '../../utils/id.js';
 import { type GlobalOptions } from '../../lib/types.js';
 import { toCliError } from '../../lib/errors.js';
 import * as logger from '../../utils/logger.js';
+import type { QueryDataSourceResponse } from '@notionhq/client/build/src/api-endpoints.js';
 
 export function registerDbExportCommand(db: Command): void {
   db.command('export')
@@ -26,8 +27,11 @@ export function registerDbExportCommand(db: Command): void {
     .action(async (rawId: string, cmdOpts: { out?: string }) => {
       try {
         const opts = db.optsWithGlobals<GlobalOptions>();
-        const dbId = parseNotionId(rawId);
+        const rawIdParsed = parseNotionId(rawId);
         const client = getClient(opts.token);
+
+        // Resolve db ID to data source ID
+        const dbId = await resolveDataSourceId(client, rawIdParsed);
 
         // Fetch all rows with pagination
         const allResults: Array<Record<string, unknown>> = [];
@@ -35,9 +39,9 @@ export function registerDbExportCommand(db: Command): void {
         let hasMore = true;
 
         while (hasMore) {
-          const response = await withRetry(
+          const response: QueryDataSourceResponse = await withRetry(
             () =>
-              client.dataSources.query({
+              (client as any).dataSources.query({
                 data_source_id: dbId,
                 page_size: 100,
                 start_cursor: cursor,

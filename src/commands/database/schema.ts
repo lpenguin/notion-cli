@@ -8,12 +8,13 @@
  */
 
 import { type Command } from 'commander';
-import { getClient } from '../../lib/client.js';
+import { getClient, resolveDataSourceId } from '../../lib/client.js';
 import { printSuccess, printError, formatTable, isJsonMode } from '../../lib/output.js';
 import { withRetry } from '../../lib/rate-limit.js';
 import { parseNotionId } from '../../utils/id.js';
 import { type GlobalOptions, type DbSchema, type DbPropertySchema } from '../../lib/types.js';
 import { toCliError } from '../../lib/errors.js';
+import type { GetDataSourceResponse } from '@notionhq/client/build/src/api-endpoints.js';
 
 export function registerDbSchemaCommand(db: Command): void {
   db.command('schema')
@@ -22,22 +23,25 @@ export function registerDbSchemaCommand(db: Command): void {
     .action(async (rawId: string) => {
       try {
         const opts = db.optsWithGlobals<GlobalOptions>();
-        const dbId = parseNotionId(rawId);
+        const rawIdParsed = parseNotionId(rawId);
         const client = getClient(opts.token);
 
-        const database = await withRetry(
-          () => client.databases.retrieve({ database_id: dbId }),
-          'databases.retrieve',
+        // Resolve db ID to data source ID
+        const dbId = await resolveDataSourceId(client, rawIdParsed);
+
+        const dataSource: GetDataSourceResponse = await withRetry(
+          () => (client as any).dataSources.retrieve({ data_source_id: dbId }),
+          'dataSources.retrieve',
         );
 
-        const dbObj = database as Record<string, unknown>;
+        const dbObj = dataSource as any;
         const titleArr = dbObj['title'] as Array<Record<string, unknown>> | undefined;
         let title = 'Untitled';
         if (titleArr !== undefined && titleArr.length > 0) {
           title = (titleArr[0]?.['plain_text'] as string | undefined) ?? 'Untitled';
         }
 
-        const props = dbObj['properties'] as Record<string, Record<string, unknown>>;
+        const props = (dbObj['properties'] as Record<string, Record<string, unknown>>) ?? {};
         const properties: DbPropertySchema[] = Object.entries(props).map(
           ([name, prop]) => {
             const type = prop['type'] as string;
