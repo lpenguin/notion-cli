@@ -34,13 +34,23 @@ describe('Validators', () => {
       }
     });
 
-    it('should parse "5:" as start to infinity', () => {
-      const result = lineRangeSchema.safeParse('5:');
+    it('should parse "192:256"', () => {
+      const result = lineRangeSchema.safeParse('192:256');
       expect(result.success).toBe(true);
       if (result.success) {
-        expect(result.data.start).toBe(5);
-        expect(result.data.end).toBe(Infinity);
+        expect(result.data.start).toBe(192);
+        expect(result.data.end).toBe(256);
       }
+    });
+
+    it('should reject "5:" (missing end)', () => {
+      const result = lineRangeSchema.safeParse('5:');
+      expect(result.success).toBe(false);
+    });
+
+    it('should reject ":256" (missing start)', () => {
+      const result = lineRangeSchema.safeParse(':256');
+      expect(result.success).toBe(false);
     });
 
     it('should reject invalid format', () => {

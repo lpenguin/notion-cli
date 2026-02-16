@@ -55,21 +55,6 @@ describe('Patch Engine', () => {
       expect(lines.length).toBe(original.split('\n').length - 3);
     });
 
-    it('should replace from start to end of file with end=Infinity', () => {
-      const result = applyPatchOperation(original, {
-        mode: 'lines',
-        start: 7,
-        end: Infinity,
-        content: '## New Section\n\nNew content.',
-      });
-
-      const lines = result.patched.split('\n');
-      expect(lines[6]).toBe('## New Section');
-      expect(lines[7]).toBe('');
-      expect(lines[8]).toBe('New content.');
-      expect(lines.length).toBe(9);
-    });
-
     it('should throw for start line < 1', () => {
       expect(() =>
         applyPatchOperation(original, {
@@ -79,31 +64,6 @@ describe('Patch Engine', () => {
           content: 'test',
         }),
       ).toThrow('start must be >= 1');
-    });
-  });
-
-  describe('Append', () => {
-    it('should append content to end', () => {
-      const result = applyPatchOperation(original, {
-        mode: 'append',
-        content: '## Appended Section',
-      });
-
-      expect(result.patched).toContain('## Appended Section');
-      expect(result.patched.indexOf('Content here.')).toBeLessThan(
-        result.patched.indexOf('## Appended Section'),
-      );
-    });
-  });
-
-  describe('Prepend', () => {
-    it('should prepend content to beginning', () => {
-      const result = applyPatchOperation(original, {
-        mode: 'prepend',
-        content: '> Note: This is a draft.',
-      });
-
-      expect(result.patched.startsWith('> Note: This is a draft.')).toBe(true);
     });
   });
 });

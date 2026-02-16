@@ -1,18 +1,13 @@
 /**
  * Patch engine — apply edits to Markdown content.
  *
- * Three modes designed for AI agent workflows:
- *
- * 1. Line-range replacement (--lines START:END)
- *    Replace lines START through END with new content.
- *    Familiar to coding agents that work with line numbers.
- *
- * 2. Append / Prepend (--append / --prepend)
- *    Add content to the end or beginning of the page.
+ * Line-range replacement (--lines START:END)
+ * Replace lines START through END with new content.
+ * Familiar to coding agents that work with line numbers.
  */
 
 import { createTwoFilesPatch } from 'diff';
-import { type PatchOperation, type PatchLineRange, type PatchAppend, type PatchPrepend } from './types.js';
+import { type PatchOperation, type PatchLineRange } from './types.js';
 import { ValidationError } from './errors.js';
 import * as logger from '../utils/logger.js';
 
@@ -34,26 +29,17 @@ export function applyPatchOperation(
   original: string,
   operation: PatchOperation,
 ): PatchResult {
-  switch (operation.mode) {
-    case 'lines':
-      return applyLineRange(original, operation);
-    case 'append':
-      return applyAppend(original, operation);
-    case 'prepend':
-      return applyPrepend(original, operation);
-  }
+  return applyLineRange(original, operation);
 }
 
 /**
- * Mode 1: Line-range replacement.
+ * Line-range replacement.
  *
  * Replace lines [start, end] (1-indexed, inclusive) with new content.
  *
  * Special cases:
  * - start === end: Replace a single line.
- * - end === Infinity: Replace from start to end of file.
  * - Content is empty: Delete the lines.
- * - start > total lines: Append at end.
  */
 function applyLineRange(original: string, op: PatchLineRange): PatchResult {
   const lines = original.split('\n');
@@ -64,7 +50,7 @@ function applyLineRange(original: string, op: PatchLineRange): PatchResult {
     throw new ValidationError('Line range start must be >= 1.');
   }
 
-  const effectiveEnd = op.end === Infinity ? totalLines : Math.min(op.end, totalLines);
+  const effectiveEnd = Math.min(op.end, totalLines);
 
   if (op.start > totalLines + 1) {
     throw new ValidationError(
@@ -82,26 +68,6 @@ function applyLineRange(original: string, op: PatchLineRange): PatchResult {
   const newLines = op.content === '' ? [] : op.content.split('\n');
   const patched = [...before, ...newLines, ...after].join('\n');
 
-  return buildResult(original, patched);
-}
-
-/**
- * Mode 2: Append content to the end of the document.
- */
-function applyAppend(original: string, op: PatchAppend): PatchResult {
-  logger.debug(`Appending ${String(op.content.length)} chars.`);
-  const patched = original.endsWith('\n')
-    ? `${original}${op.content}`
-    : `${original}\n${op.content}`;
-  return buildResult(original, patched);
-}
-
-/**
- * Mode 3: Prepend content to the beginning of the document.
- */
-function applyPrepend(original: string, op: PatchPrepend): PatchResult {
-  logger.debug(`Prepending ${String(op.content.length)} chars.`);
-  const patched = `${op.content}\n${original}`;
   return buildResult(original, patched);
 }
 

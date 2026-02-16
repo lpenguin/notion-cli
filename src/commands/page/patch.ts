@@ -4,17 +4,9 @@
  * Partially edit a Notion page's Markdown content.
  * Designed for AI agents / coding agents that need to make targeted edits.
  *
- * Patch modes:
- *
- * 1. Line-range replacement (--lines START:END):
+ * Line-range replacement (--lines START:END):
  *    notion-cli page patch <id> --lines 5:12 --content "new content" -y
  *    notion-cli page patch <id> --lines 5:12 --file patch.md -y
- *
- * 2. Append (--append):
- *    notion-cli page patch <id> --append --content "extra content" -y
- *
- * 3. Prepend (--prepend):
- *    notion-cli page patch <id> --prepend --content "header content" -y
  *
  * Workflow:
  * 1. Fetch current page → Markdown
@@ -47,21 +39,17 @@ export function registerPagePatchCommand(page: Command): void {
   page
     .command('patch')
     .description(
-      'Partially edit a Notion page. Supports line-range, append, and prepend.',
+      'Partially edit a Notion page using line-range replacement.',
     )
     .argument('<page-id>', 'Notion page ID or URL')
-    .option('--lines <range>', 'Line range to replace (e.g., "5:12", "5:" for rest of file)')
-    .option('--append', 'Append content to end of page')
-    .option('--prepend', 'Prepend content to beginning of page')
-    .option('-f, --file <path>', 'Path to content/patch file')
+    .option('--lines <range>', 'Line range to replace (e.g., "192:256")')
+    .option('-f, --file <path>', 'Path to content file')
     .option('--content <text>', 'Inline content for replacement')
     .action(
       async (
         rawId: string,
         cmdOpts: {
           lines?: string;
-          append?: boolean;
-          prepend?: boolean;
           file?: string;
           content?: string;
         },
@@ -187,53 +175,23 @@ export function registerPagePatchCommand(page: Command): void {
  */
 function resolvePatchOperation(cmdOpts: {
   lines?: string;
-  append?: boolean;
-  prepend?: boolean;
   file?: string;
   content?: string;
 }): PatchOperation {
-  const modeCount = [
-    cmdOpts.lines !== undefined,
-    cmdOpts.append === true,
-    cmdOpts.prepend === true,
-  ].filter(Boolean).length;
-
-  if (modeCount === 0) {
+  if (cmdOpts.lines === undefined) {
     throw new ValidationError(
-      'No patch mode specified. Use --lines, --append, or --prepend.',
-    );
-  }
-  if (modeCount > 1) {
-    throw new ValidationError(
-      'Multiple patch modes specified. Use only one of --lines, --append, --prepend.',
+      'Missing --lines option. Example: --lines 192:256',
     );
   }
 
-  // Mode: Line range
-  if (cmdOpts.lines !== undefined) {
-    const range = lineRangeSchema.parse(cmdOpts.lines);
-    const content = resolveContentSync(cmdOpts.file, cmdOpts.content);
-    return {
-      mode: 'lines',
-      start: range.start,
-      end: range.end,
-      content,
-    };
-  }
-
-  // Mode: Append
-  if (cmdOpts.append === true) {
-    const content = resolveContentSync(cmdOpts.file, cmdOpts.content);
-    return { mode: 'append', content };
-  }
-
-  // Mode: Prepend
-  if (cmdOpts.prepend === true) {
-    const content = resolveContentSync(cmdOpts.file, cmdOpts.content);
-    return { mode: 'prepend', content };
-  }
-
-  throw new ValidationError('Unable to determine patch mode.');
+  const range = lineRangeSchema.parse(cmdOpts.lines);
+  const content = resolveContentSync(cmdOpts.file, cmdOpts.content);
+  return {
+    mode: 'lines',
+    start: range.start,
+    end: range.end,
+    content,
+  };
 }
 
 function resolveContentSync(filePath?: string, inlineContent?: string): string {

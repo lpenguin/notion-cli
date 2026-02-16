@@ -106,17 +106,7 @@ export interface PatchLineRange {
   readonly content: string;
 }
 
-export interface PatchAppend {
-  readonly mode: 'append';
-  readonly content: string;
-}
-
-export interface PatchPrepend {
-  readonly mode: 'prepend';
-  readonly content: string;
-}
-
-export type PatchOperation = PatchLineRange | PatchAppend | PatchPrepend;
+export type PatchOperation = PatchLineRange;
 
 /** Config file shape. */
 export interface CliConfig {

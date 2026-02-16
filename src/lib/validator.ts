@@ -36,18 +36,16 @@ export const tokenSchema = z
 /** Line range: "START:END" where both are positive integers. */
 export const lineRangeSchema = z
   .string()
-  .regex(/^\d+:\d*$/, 'Line range must be in format START:END (e.g., "5:12" or "5:").')
+  .regex(/^\d+:\d+$/, 'Line range must be in format START:END (e.g., "192:256"). Both start and end are required.')
   .transform((val) => {
     const [startStr, endStr] = val.split(':');
     const start = parseInt(startStr ?? '0', 10);
-    const end = endStr === '' ? Infinity : parseInt(endStr ?? '0', 10);
+    const end = parseInt(endStr ?? '0', 10);
     return { start, end };
   })
   .refine((r) => r.start >= 1, 'Start line must be >= 1.')
-  .refine(
-    (r) => r.end === Infinity || r.end >= r.start,
-    'End line must be >= start line.',
-  );
+  .refine((r) => r.end >= 1, 'End line must be >= 1.')
+  .refine((r) => r.end >= r.start, 'End line must be >= start line.');
 
 /** Search query: non-empty string, max 100 chars. */
 export const searchQuerySchema = z
