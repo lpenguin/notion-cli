@@ -45,14 +45,14 @@ export function registerDbQueryCommand(db: Command): void {
           // Query the database
           const response = await withRetry(
             () =>
-              client.databases.query({
-                database_id: dbId,
+              client.dataSources.query({
+                data_source_id: dbId,
                 filter: filter as undefined,
                 sorts: sorts as undefined,
                 page_size: Math.min(limit, 100),
                 start_cursor: cmdOpts.cursor,
               }),
-            'databases.query',
+            'dataSources.query',
           );
 
           // Extract property names from first result
