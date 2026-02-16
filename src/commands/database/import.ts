@@ -10,7 +10,7 @@
 
 import { type Command } from 'commander';
 import { readFileSync } from 'node:fs';
-import { getClient } from '../../lib/client.js';
+import { getClient, resolveDataSourceId } from '../../lib/client.js';
 import { csvToRows, buildPropertyValue } from '../../lib/csv.js';
 import { printSuccess, printError, isJsonMode } from '../../lib/output.js';
 import { isDryRun } from '../../lib/safety.js';
@@ -19,6 +19,7 @@ import { parseNotionId } from '../../utils/id.js';
 import { type GlobalOptions } from '../../lib/types.js';
 import { toCliError, ValidationError } from '../../lib/errors.js';
 import * as logger from '../../utils/logger.js';
+import type { GetDataSourceResponse } from '@notionhq/client/build/src/api-endpoints.js';
 
 export function registerDbImportCommand(db: Command): void {
   db.command('import')
@@ -28,8 +29,11 @@ export function registerDbImportCommand(db: Command): void {
     .action(async (rawId: string, cmdOpts: { file: string }) => {
       try {
         const opts = db.optsWithGlobals<GlobalOptions>();
-        const dbId = parseNotionId(rawId);
+        const rawIdParsed = parseNotionId(rawId);
         const client = getClient(opts.token);
+
+        // Resolve db ID to data source ID
+        const dbId = await resolveDataSourceId(client, rawIdParsed);
 
         // Read and parse CSV
         const csvContent = readFileSync(cmdOpts.file, 'utf-8');
@@ -39,12 +43,12 @@ export function registerDbImportCommand(db: Command): void {
           throw new ValidationError('CSV file contains no data rows.');
         }
 
-        // Fetch database schema to know property types
-        const dbSchema = await withRetry(
-          () => client.databases.retrieve({ database_id: dbId }),
-          'databases.retrieve',
+        // Fetch data source schema to know property types
+        const dataSource: GetDataSourceResponse = await withRetry(
+          () => (client as any).dataSources.retrieve({ data_source_id: dbId }),
+          'dataSources.retrieve',
         );
-        const schemaProps = (dbSchema as Record<string, unknown>)['properties'] as Record<
+        const schemaProps = (dataSource as any).properties as Record<
           string,
           Record<string, unknown>
         >;
@@ -83,8 +87,8 @@ export function registerDbImportCommand(db: Command): void {
             await withRetry(
               () =>
                 client.pages.create({
-                  parent: { database_id: dbId },
-                  properties: properties as Parameters<typeof client.pages.create>[0]['properties'],
+                  parent: { [ (dataSource as any).parent?.type === 'data_source_id' ? 'data_source_id' : 'database_id' ]: dbId },
+                  properties: properties as any,
                 }),
               'pages.create',
             );
