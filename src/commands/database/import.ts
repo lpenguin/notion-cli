@@ -84,10 +84,14 @@ export function registerDbImportCommand(db: Command): void {
         for (const row of toCreate) {
           try {
             const properties = buildNotionProperties(row.properties, schemaProps);
+            const parentKey = (dataSource as any).parent?.type === 'data_source_id' ? 'data_source_id' : 'database_id';
+            // Even if we query via data_source, we should try creating via database_id first 
+            // as pages.create might not support data_source_id yet in some versions/cases.
+            // But let's first check if rawIdParsed (the original ID) works as database_id.
             await withRetry(
               () =>
                 client.pages.create({
-                  parent: { [ (dataSource as any).parent?.type === 'data_source_id' ? 'data_source_id' : 'database_id' ]: dbId },
+                  parent: { database_id: rawIdParsed } as any,
                   properties: properties as any,
                 }),
               'pages.create',
