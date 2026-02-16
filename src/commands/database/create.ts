@@ -12,7 +12,10 @@ import { parseNotionId } from '../../utils/id.js';
 import { type GlobalOptions } from '../../lib/types.js';
 import { toCliError } from '../../lib/errors.js';
 import * as logger from '../../utils/logger.js';
-import type { DatabaseObjectResponse } from '@notionhq/client/build/src/api-endpoints.js';
+import type {
+  DatabaseObjectResponse,
+  CreateDataSourceParameters,
+} from '@notionhq/client/build/src/api-endpoints.js';
 
 export function registerDbCreateCommand(db: Command): void {
   db.command('create')
@@ -47,8 +50,7 @@ export function registerDbCreateCommand(db: Command): void {
 
         const response = (await withRetry(
           () =>
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (client.databases.create as any)({
+            client.databases.create({
               parent: {
                 type: 'page_id',
                 page_id: parentId,
@@ -62,7 +64,7 @@ export function registerDbCreateCommand(db: Command): void {
                 },
               ],
               initial_data_source: {
-                properties,
+                properties: properties as CreateDataSourceParameters['properties'],
               },
             }),
           'databases.create',
