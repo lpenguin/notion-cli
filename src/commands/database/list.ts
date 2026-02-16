@@ -30,7 +30,7 @@ export function registerDbListCommand(db: Command): void {
           () =>
             client.search({
               query: cmdOpts.query ?? '',
-              filter: { value: 'database', property: 'object' },
+              filter: { value: 'data_source', property: 'object' },
               page_size: Math.min(limit, 100),
               start_cursor: cmdOpts.cursor,
             }),
