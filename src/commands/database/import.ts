@@ -19,7 +19,12 @@ import { parseNotionId } from '../../utils/id.js';
 import { type GlobalOptions } from '../../lib/types.js';
 import { toCliError, ValidationError } from '../../lib/errors.js';
 import * as logger from '../../utils/logger.js';
-import type { GetDataSourceResponse } from '@notionhq/client/build/src/api-endpoints.js';
+import type {
+  GetDataSourceResponse,
+  QueryDataSourceResponse,
+  CreatePageParameters,
+  UpdatePageParameters,
+} from '@notionhq/client';
 
 export function registerDbImportCommand(db: Command): void {
   db.command('import')
@@ -46,36 +51,33 @@ export function registerDbImportCommand(db: Command): void {
 
         // Fetch data source schema to know property types
         const dataSource: GetDataSourceResponse = await withRetry(
-          () => (client as any).dataSources.retrieve({ data_source_id: dbId }),
+          () => client.dataSources.retrieve({ data_source_id: dbId }),
           'dataSources.retrieve',
         );
-        const schemaProps = (dataSource as any).properties as Record<
-          string,
-          Record<string, unknown>
-        >;
+        const schemaProps = dataSource.properties;
 
         const toCreate = rows.filter((r) => r.id === undefined);
         const toUpdate = rows.filter((r) => r.id !== undefined);
         const csvIds = new Set(rows.map((r) => r.id).filter(Boolean));
 
         let toArchive: string[] = [];
-        if (cmdOpts.sync) {
+        if (cmdOpts.sync === true) {
           logger.info('Sync mode enabled: fetching current pages from Notion for comparison...');
           let cursor: string | undefined;
           let hasMore = true;
           const notionIds: string[] = [];
 
           while (hasMore) {
-            const response: any = await withRetry(
+            const response: QueryDataSourceResponse = await withRetry(
               () =>
-                (client as any).dataSources.query({
+                client.dataSources.query({
                   data_source_id: dbId,
                   page_size: 100,
                   start_cursor: cursor,
                 }),
               'dataSources.query',
             );
-            notionIds.push(...response.results.map((r: any) => r.id));
+            notionIds.push(...response.results.map((r) => r.id));
             hasMore = response.has_more;
             cursor = response.next_cursor ?? undefined;
           }
@@ -127,15 +129,11 @@ export function registerDbImportCommand(db: Command): void {
         for (const row of toCreate) {
           try {
             const properties = buildNotionProperties(row.properties, schemaProps);
-            const parentKey = (dataSource as any).parent?.type === 'data_source_id' ? 'data_source_id' : 'database_id';
-            // Even if we query via data_source, we should try creating via database_id first 
-            // as pages.create might not support data_source_id yet in some versions/cases.
-            // But let's first check if rawIdParsed (the original ID) works as database_id.
             await withRetry(
               () =>
                 client.pages.create({
-                  parent: { database_id: rawIdParsed } as any,
-                  properties: properties as any,
+                  parent: { database_id: rawIdParsed },
+                  properties: properties as CreatePageParameters['properties'],
                 }),
               'pages.create',
             );
@@ -154,7 +152,7 @@ export function registerDbImportCommand(db: Command): void {
               () =>
                 client.pages.update({
                   page_id: row.id ?? '',
-                  properties: properties as Parameters<typeof client.pages.update>[0]['properties'],
+                  properties: properties as UpdatePageParameters['properties'],
                 }),
               'pages.update',
             );
@@ -189,12 +187,14 @@ export function registerDbImportCommand(db: Command): void {
     });
 }
 
+type SchemaProperties = GetDataSourceResponse['properties'];
+
 /**
  * Build Notion page properties from CSV values + schema.
  */
 function buildNotionProperties(
   csvProps: Record<string, string>,
-  schema: Record<string, Record<string, unknown>>,
+  schema: SchemaProperties,
 ): Record<string, unknown> {
   const properties: Record<string, unknown> = {};
 
@@ -205,8 +205,7 @@ function buildNotionProperties(
       continue;
     }
 
-    const type = propSchema['type'] as string;
-    const notionValue = buildPropertyValue(type, value);
+    const notionValue = buildPropertyValue(propSchema.type, value);
     if (notionValue !== undefined) {
       properties[name] = notionValue;
     }

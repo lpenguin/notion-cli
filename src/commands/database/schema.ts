@@ -14,6 +14,7 @@ import { withRetry } from '../../lib/rate-limit.js';
 import { parseNotionId } from '../../utils/id.js';
 import { type GlobalOptions, type DbSchema, type DbPropertySchema } from '../../lib/types.js';
 import { toCliError } from '../../lib/errors.js';
+import { isFullDataSource } from '@notionhq/client';
 import type { GetDataSourceResponse } from '@notionhq/client/build/src/api-endpoints.js';
 
 export function registerDbSchemaCommand(db: Command): void {
@@ -30,34 +31,31 @@ export function registerDbSchemaCommand(db: Command): void {
         const dbId = await resolveDataSourceId(client, rawIdParsed);
 
         const dataSource: GetDataSourceResponse = await withRetry(
-          () => (client as any).dataSources.retrieve({ data_source_id: dbId }),
+          () => client.dataSources.retrieve({ data_source_id: dbId }),
           'dataSources.retrieve',
         );
 
-        const dbObj = dataSource as any;
-        const titleArr = dbObj['title'] as Array<Record<string, unknown>> | undefined;
         let title = 'Untitled';
-        if (titleArr !== undefined && titleArr.length > 0) {
-          title = (titleArr[0]?.['plain_text'] as string | undefined) ?? 'Untitled';
+        if (isFullDataSource(dataSource) && dataSource.title.length > 0) {
+          const firstTitle = dataSource.title[0];
+          if (firstTitle !== undefined) {
+            title = firstTitle.plain_text;
+          }
         }
 
-        const props = (dbObj['properties'] as Record<string, Record<string, unknown>>) ?? {};
+        const props = dataSource.properties;
         const properties: DbPropertySchema[] = Object.entries(props).map(
           ([name, prop]) => {
-            const type = prop['type'] as string;
+            const { type } = prop;
             let options: string[] | undefined;
 
             // Extract select/multi_select/status options
-            if (type === 'select' || type === 'multi_select' || type === 'status') {
-              const typeProp = prop[type] as Record<string, unknown> | undefined;
-              const optionsArr = typeProp?.['options'] as
-                | Array<Record<string, unknown>>
-                | undefined;
-              if (optionsArr !== undefined) {
-                options = optionsArr.map(
-                  (o) => (o['name'] as string | undefined) ?? '',
-                );
-              }
+            if (prop.type === 'select') {
+              options = prop.select.options.map((o) => o.name);
+            } else if (prop.type === 'multi_select') {
+              options = prop.multi_select.options.map((o) => o.name);
+            } else if (prop.type === 'status') {
+              options = prop.status.options.map((o) => o.name);
             }
 
             return { name, type, options };

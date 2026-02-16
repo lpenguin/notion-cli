@@ -2,10 +2,9 @@
  * Notion API client singleton with token resolution.
  */
 
-import { Client } from '@notionhq/client';
+import { Client, APIResponseError, APIErrorCode, isFullDatabase } from '@notionhq/client';
 import { resolveToken } from './config.js';
 import * as logger from '../utils/logger.js';
-import type { GetDataSourceResponse } from '@notionhq/client/build/src/api-endpoints.js';
 
 let clientInstance: Client | undefined;
 
@@ -37,25 +36,21 @@ export async function resolveDataSourceId(client: Client, dbId: string): Promise
   try {
     // We attempt to retrieve as a database first
     const db = await client.databases.retrieve({ database_id: dbId });
-    
-    // Check if it's already a data source object or a database with data sources
-    if ((db as any).object === 'data_source') {
-      return (db as any).id;
+
+    // Check if the database has data_sources (new API)
+    if (isFullDatabase(db) && db.data_sources.length > 0) {
+      const firstDataSource = db.data_sources[0];
+      if (firstDataSource !== undefined) {
+        return firstDataSource.id;
+      }
     }
-    
-    const dbWithSources = db as any;
-    if (dbWithSources.data_sources && dbWithSources.data_sources.length > 0) {
-      return dbWithSources.data_sources[0].id;
-    }
-  } catch (err: any) {
+  } catch (err: unknown) {
     // If retrieve fails with 404, it might already be a data_source ID (which databases.retrieve won't find)
-    if (err.code === 'object_not_found') {
+    if (APIResponseError.isAPIResponseError(err) && err.code === APIErrorCode.ObjectNotFound) {
       try {
-        const ds = await (client as any).dataSources.retrieve({ data_source_id: dbId }) as GetDataSourceResponse;
-        if (ds.object === 'data_source') {
-          return ds.id;
-        }
-      } catch (innerErr) {
+        const ds = await client.dataSources.retrieve({ data_source_id: dbId });
+        return ds.id;
+      } catch {
         // Fallback to original ID if all else fails
         return dbId;
       }

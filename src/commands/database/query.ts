@@ -49,10 +49,10 @@ export function registerDbQueryCommand(db: Command): void {
           // Query the data source
           const response: QueryDataSourceResponse = await withRetry(
             () =>
-              (client as any).dataSources.query({
+              client.dataSources.query({
                 data_source_id: dbId,
-                filter: filter,
-                sorts: sorts,
+                filter,
+                sorts,
                 page_size: Math.min(limit, 100),
                 start_cursor: cmdOpts.cursor,
               }),
@@ -61,10 +61,9 @@ export function registerDbQueryCommand(db: Command): void {
 
           // Extract property names from first result
           const results = response.results;
-          const propertyNames = results.length > 0
-            ? Object.keys(
-                ((results[0] as any)?.['properties'] as Record<string, unknown> | undefined) ?? {},
-              )
+          const firstResult = results[0];
+          const propertyNames = firstResult !== undefined && 'properties' in firstResult
+            ? Object.keys(firstResult.properties)
             : [];
 
           if (isJsonMode()) {

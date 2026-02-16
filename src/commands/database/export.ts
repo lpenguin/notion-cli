@@ -41,7 +41,7 @@ export function registerDbExportCommand(db: Command): void {
         while (hasMore) {
           const response: QueryDataSourceResponse = await withRetry(
             () =>
-              (client as any).dataSources.query({
+              client.dataSources.query({
                 data_source_id: dbId,
                 page_size: 100,
                 start_cursor: cursor,
