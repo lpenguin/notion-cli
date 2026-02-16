@@ -64,7 +64,7 @@ async function blocksToMarkdownParallel(
       // Notion API returns chunks, and typically notion-to-md expects to calculate 
       // these IDs sequentially. Here we simulate the index for the current list.
       // @ts-ignore
-      if (block.type === 'numbered_list_item' && block.numbered_list_item) {
+      if (block.type === 'numbered_list_item') {
         // Calculate the relative index in the current list sequence
         let listIndex = 1;
         for (let i = index - 1; i >= 0; i--) {
