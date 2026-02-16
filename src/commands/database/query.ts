@@ -7,7 +7,7 @@
  */
 
 import { type Command } from 'commander';
-import { getClient } from '../../lib/client.js';
+import { getClient, resolveDataSourceId } from '../../lib/client.js';
 import { rowsToCsv } from '../../lib/csv.js';
 import { printSuccess, printError, isJsonMode } from '../../lib/output.js';
 import { withRetry } from '../../lib/rate-limit.js';
@@ -15,6 +15,7 @@ import { parseNotionId } from '../../utils/id.js';
 import { type GlobalOptions } from '../../lib/types.js';
 import { toCliError } from '../../lib/errors.js';
 import * as logger from '../../utils/logger.js';
+import type { QueryDataSourceResponse } from '@notionhq/client/build/src/api-endpoints.js';
 
 export function registerDbQueryCommand(db: Command): void {
   db.command('query')
@@ -31,24 +32,27 @@ export function registerDbQueryCommand(db: Command): void {
       ) => {
         try {
           const opts = db.optsWithGlobals<GlobalOptions>();
-          const dbId = parseNotionId(rawId);
+          const rawIdParsed = parseNotionId(rawId);
           const client = getClient(opts.token);
           const limit = parseInt(cmdOpts.limit ?? '100', 10);
 
+          // Resolve db ID to data source ID (2-step approach)
+          const dbId = await resolveDataSourceId(client, rawIdParsed);
+
           // Parse filter and sort
-          const filter = cmdOpts.filter !== undefined ? JSON.parse(cmdOpts.filter) as Record<string, unknown> : undefined;
-          const parsedSort = cmdOpts.sort !== undefined ? JSON.parse(cmdOpts.sort) as Record<string, unknown> | Array<Record<string, unknown>> : undefined;
+          const filter = cmdOpts.filter !== undefined ? JSON.parse(cmdOpts.filter) : undefined;
+          const parsedSort = cmdOpts.sort !== undefined ? JSON.parse(cmdOpts.sort) : undefined;
           const sorts = parsedSort !== undefined
             ? (Array.isArray(parsedSort) ? parsedSort : [parsedSort])
             : undefined;
 
-          // Query the database
-          const response = await withRetry(
+          // Query the data source
+          const response: QueryDataSourceResponse = await withRetry(
             () =>
-              client.dataSources.query({
+              (client as any).dataSources.query({
                 data_source_id: dbId,
-                filter: filter as undefined,
-                sorts: sorts as undefined,
+                filter: filter,
+                sorts: sorts,
                 page_size: Math.min(limit, 100),
                 start_cursor: cmdOpts.cursor,
               }),
@@ -56,10 +60,10 @@ export function registerDbQueryCommand(db: Command): void {
           );
 
           // Extract property names from first result
-          const results = response.results as Array<Record<string, unknown>>;
+          const results = response.results;
           const propertyNames = results.length > 0
             ? Object.keys(
-                (results[0]?.['properties'] as Record<string, unknown> | undefined) ?? {},
+                ((results[0] as any)?.['properties'] as Record<string, unknown> | undefined) ?? {},
               )
             : [];
 
