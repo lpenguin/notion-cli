@@ -49,6 +49,7 @@ export interface GlobalOptions {
 /** Page read result. */
 export interface PageReadResult {
   readonly pageId: string;
+  readonly parentId?: string;
   readonly title: string;
   readonly markdown: string;
   readonly lastEditedTime: string;

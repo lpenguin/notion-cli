@@ -52,6 +52,29 @@ export function registerPageReadCommand(page: Command): void {
           }
         }
 
+        // Extract parent ID
+        const parent = (pageObj as Record<string, unknown>)['parent'] as
+          | { type: string; [key: string]: unknown }
+          | undefined;
+
+        let parentId: string | undefined;
+        if (parent) {
+          switch (parent.type) {
+            case 'database_id':
+              parentId = parent.database_id as string;
+              break;
+            case 'page_id':
+              parentId = parent.page_id as string;
+              break;
+            case 'block_id':
+              parentId = parent.block_id as string;
+              break;
+            case 'workspace':
+              parentId = 'workspace';
+              break;
+          }
+        }
+
         // Fetch and convert content
         let markdown = await withRateLimit(
           () => notionPageToMarkdown(client, pageId),
@@ -62,9 +85,11 @@ export function registerPageReadCommand(page: Command): void {
           markdown = addLineNumbers(markdown);
         }
 
+        const lastEditedTime = (pageObj as Record<string, unknown>)['last_edited_time'] as string;
+
         // Output
         if (isJsonMode()) {
-          printSuccess({ pageId, title, markdown });
+          printSuccess({ pageId, parentId, title, markdown, lastEditedTime });
         } else {
           process.stdout.write(`${markdown}\n`);
           logger.success(`Read page: ${title}`);
