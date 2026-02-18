@@ -9,6 +9,7 @@
  *   notion-cli page read <id> [--numbered-lines]       Read page as Markdown
  *   notion-cli page create --parent <id> --file <path> Create page from Markdown
  *   notion-cli page write <id> [--file <path>]        Replace page content
+ *   notion-cli page write-properties <id> --file <f>  Update page properties from CSV
  *   notion-cli page list [--query <text>]              List pages
  *   notion-cli db query <id> [--filter <json>]         Query database → CSV
  *   notion-cli db export <id> --out <file.csv>         Export database → CSV
@@ -44,6 +45,7 @@ import { toCliError } from './lib/errors.js';
 import { registerPageReadCommand } from './commands/page/read.js';
 import { registerPageCreateCommand } from './commands/page/create.js';
 import { registerPageWriteCommand } from './commands/page/write.js';
+import { registerPageWritePropertiesCommand } from './commands/page/write-properties.js';
 import { registerPagePatchCommand } from './commands/page/patch.js';
 import { registerPageListCommand } from './commands/page/list.js';
 
@@ -95,6 +97,7 @@ const page = program
 registerPageReadCommand(page);
 registerPageCreateCommand(page);
 registerPageWriteCommand(page);
+registerPageWritePropertiesCommand(page);
 registerPagePatchCommand(page);
 registerPageListCommand(page);
 
