@@ -138,6 +138,45 @@ notion-cli page write abc123def456 --file mypage.md --dry-run
 
 ---
 
+### `page patch` — Partially Edit Page Content
+
+Replace a specific line range in a Notion page's Markdown content without rewriting the whole page. This is intended for targeted edits and preserves unaffected blocks when applying the change.
+
+```bash
+notion-cli page patch <page-id> --lines 5:12 --file patch.md
+notion-cli page patch <page-id> --lines 5:12 --content "Updated content"
+```
+
+| Option | Description |
+|--------|-------------|
+| `--lines <start:end>` | **Required.** 1-indexed, inclusive line range to replace |
+| `-f, --file <path>` | Path to replacement Markdown file |
+| `--content <markdown>` | Inline replacement Markdown |
+
+**Examples:**
+
+```bash
+# Replace one line
+notion-cli page patch abc123def456 --lines 3:3 --content "Updated line 3"
+
+# Replace a section from a file
+notion-cli page patch abc123def456 --lines 10:18 --file section.md
+
+# Delete a range by replacing it with empty content
+notion-cli page patch abc123def456 --lines 20:24 --content ""
+
+# Preview the diff without writing changes
+notion-cli page patch abc123def456 --lines 5:12 --file patch.md --dry-run
+```
+
+**Notes:**
+
+- Line ranges are 1-indexed and inclusive
+- Use `page read` first if you need to inspect current line numbers
+- Empty replacement content deletes the selected lines
+
+---
+
 ### `page list` — List Pages
 
 List or search Notion pages accessible to the integration.
