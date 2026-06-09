@@ -32,6 +32,10 @@
     "ai-agent"
   ],
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lpenguin/notion-cli.git"
+  },
   "engines": {
     "node": ">=18.0.0"
   },
