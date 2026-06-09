@@ -2,16 +2,22 @@ name: Publish to npm
 
 on:
   workflow_dispatch:
+    inputs:
+      version:
+        description: "Version slug (e.g. patch, minor, major, or 1.2.3)"
+        required: true
 
 jobs:
   publish:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       id-token: write # Required to mint the OIDC token for npm
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -32,8 +38,21 @@ jobs:
       - name: Test
         run: npm run test
 
-      - name: Show package version
-        run: npm pkg get version
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Bump version
+        run: npm version "${{ github.event.inputs.version }}" --no-git-tag-version
+
+      - name: Commit and tag version bump
+        run: |
+          NEW_VERSION=$(node -p "require('./package.json').version")
+          git add package.json package-lock.json
+          git commit -m "chore: release v${NEW_VERSION}"
+          git tag "v${NEW_VERSION}"
+          git push origin HEAD --tags
 
       - name: Publish to npm
         run: npm publish --provenance --access public
