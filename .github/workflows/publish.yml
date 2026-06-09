@@ -55,4 +55,4 @@ jobs:
           git push origin HEAD --tags
 
       - name: Publish to npm
-        run: npm publish --provenance --access public
+        run: npx npm@latest publish --provenance --access public
